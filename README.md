@@ -114,3 +114,13 @@ The frontend is already configured to point at the Render backend. To deploy on 
    - **Build Command**: leave blank (static files)
    - **Output Directory**: `.` (root of frontend folder)
 4. Deploy
+
+## Session Viewer
+
+To view the AI-assisted conversation that built this project:
+
+1. `opencode export > session-export.json`
+2. Open `session-viewer.html` in your browser
+3. Click "Load session-export.json" and select the exported file
+
+This renders the full chat history with user prompts, AI responses, reasoning, and tool calls in a readable chat UI.
