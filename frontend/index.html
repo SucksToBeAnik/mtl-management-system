@@ -8,7 +8,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <script>window.API_URL = 'https://mtl-management-system.onrender.com';</script>
+    <script>
+      window.API_URL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
+        ? 'http://127.0.0.1:8000'
+        : 'https://mtl-management-system.onrender.com';
+    </script>
 </head>
 <body>
     <div class="app">
