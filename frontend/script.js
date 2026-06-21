@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     renderLeads();
     renderSummary();
+    renderTimeline();
+    renderActivity();
 });
 
 // --- Theme ---
@@ -516,6 +518,8 @@ async function saveLead(event) {
         closeModal('leadModal');
         renderLeads();
         renderSummary();
+        renderTimeline();
+        renderActivity();
     } catch (e) {
         showToast(e.message, 'error');
     }
@@ -529,6 +533,8 @@ async function deleteLead(leadId) {
         if (expandedLeadId === leadId) expandedLeadId = null;
         renderLeads();
         renderSummary();
+        renderTimeline();
+        renderActivity();
     } catch (e) {
         showToast(e.message, 'error');
     }
@@ -595,6 +601,8 @@ async function saveCampaign(event) {
         closeModal('campaignModal');
         renderCampaignsForLead(parseInt(leadId));
         renderSummary();
+        renderTimeline();
+        renderActivity();
     } catch (e) {
         showToast(e.message, 'error');
     }
@@ -608,6 +616,8 @@ async function deleteCampaign(campaignId) {
         showToast('Campaign deleted');
         if (c) renderCampaignsForLead(c.team_lead_id);
         renderSummary();
+        renderTimeline();
+        renderActivity();
     } catch (e) {
         showToast(e.message, 'error');
     }
@@ -619,7 +629,171 @@ async function seedData() {
         showToast(result.message);
         renderLeads();
         renderSummary();
+        renderTimeline();
+        renderActivity();
     } catch (e) {
         showToast(e.message, 'error');
+    }
+}
+
+// --- Tabs ---
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('view-active'));
+    document.getElementById(`tab-${name}`).classList.add('tab-active');
+    document.getElementById(`view-${name}`).classList.add('view-active');
+
+    if (name === 'timeline') renderTimeline();
+    if (name === 'activity') renderActivity();
+}
+
+// --- Timeline ---
+async function renderTimeline() {
+    const container = document.getElementById('timelineContainer');
+    if (!container) return;
+    try {
+        const campaigns = await apiFetch('/api/campaigns');
+        if (campaigns.length === 0) {
+            container.innerHTML = '<p class="timeline-empty">No campaigns to show on timeline.</p>';
+            return;
+        }
+
+        // Find date range with padding
+        const today = new Date();
+        let minDate = null, maxDate = null;
+        const cData = [];
+        for (const c of campaigns) {
+            const start = new Date(c.start_date);
+            const end = c.target_end_date ? new Date(c.target_end_date) : new Date(start);
+            // Extend end by 30 days if no target end date
+            const endAdj = c.target_end_date ? new Date(end) : new Date(Math.max(end.getTime(), today.getTime()));
+            // Extend ongoing campaigns to today
+            if (c.status !== 'Completed' && c.status !== 'On Hold' && endAdj < today) {
+                endAdj.setTime(today.getTime());
+            }
+            if (!minDate || start < minDate) minDate = new Date(start);
+            if (!maxDate || endAdj > maxDate) maxDate = new Date(endAdj);
+
+            const lead = await apiFetch(`/api/leads/${c.team_lead_id}`);
+            cData.push({ ...c, start, end: endAdj, leadName: lead.name });
+        }
+
+        // Add 1 month padding
+        minDate.setMonth(minDate.getMonth() - 1);
+        maxDate.setMonth(maxDate.getMonth() + 1);
+
+        // Ensure today is within range
+        if (today < minDate) minDate = new Date(today);
+        if (today > maxDate) maxDate = new Date(today);
+        maxDate.setMonth(maxDate.getMonth() + 1);
+
+        const totalMs = maxDate.getTime() - minDate.getTime();
+        if (totalMs <= 0) return;
+
+        // Generate month headers
+        const months = [];
+        const cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        while (cursor <= maxDate) {
+            months.push(new Date(cursor));
+            cursor.setMonth(cursor.getMonth() + 1);
+        }
+
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const monthWidth = 100 / months.length;
+
+        const fmtDate = (d) => `${monthNames[d.getMonth()]} ${d.getDate()}`;
+
+        let html = `
+            <div class="timeline-header">
+                <h3>Campaign Timeline</h3>
+                <span style="font-size:12px;color:var(--text-muted);">${campaigns.length} campaigns &middot; ${fmtDate(minDate)} &mdash; ${fmtDate(maxDate)}</span>
+            </div>
+            <div class="timeline-scroll">
+                <div class="timeline-months">
+                    ${months.map(m => `<div class="timeline-month" style="width:${monthWidth}%">${monthNames[m.getMonth()]} ${m.getFullYear()}</div>`).join('')}
+                </div>
+                <div class="timeline-rows">
+                    ${cData.map(c => {
+                        const pctStart = Math.max(0, (c.start.getTime() - minDate.getTime()) / totalMs * 100);
+                        const pctEnd = Math.min(100, Math.max(pctStart + 1, (c.end.getTime() - minDate.getTime()) / totalMs * 100));
+                        const pctWidth = pctEnd - pctStart;
+                        const statusClass = c.status.toLowerCase().replace(/ /g, '-');
+                        return `
+                            <div class="timeline-row">
+                                <div class="timeline-row-label">
+                                    <div>${c.name}</div>
+                                    <div style="font-size:11px;color:var(--text-muted);font-weight:400;">${c.leadName}</div>
+                                </div>
+                                <div class="timeline-track">
+                                    <div class="timeline-bar ${statusClass}" style="left:${pctStart}%;width:${pctWidth}%;" title="${c.name}: ${c.status} (${c.progress}%)">
+                                        ${c.name.length > 16 ? c.name.slice(0, 14) + '\u2026' : c.name}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                    ${today >= minDate && today <= maxDate ? (() => {
+                        const pctToday = (today.getTime() - minDate.getTime()) / totalMs * 100;
+                        return `<div class="timeline-today-marker" style="left:${pctToday}%;"></div>`;
+                    })() : ''}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = `<p class="timeline-empty">Error loading timeline: ${e.message}</p>`;
+    }
+}
+
+// --- Activity Log ---
+async function renderActivity() {
+    const container = document.getElementById('activityContainer');
+    if (!container) return;
+    try {
+        const activities = await apiFetch('/api/activities');
+        if (activities.length === 0) {
+            container.innerHTML = '<div class="activity-empty">No activity recorded yet.</div>';
+            return;
+        }
+
+        const now = new Date();
+        const fmtTime = (d) => {
+            const dt = new Date(d);
+            const diff = now - dt;
+            if (diff < 60000) return 'just now';
+            if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+            return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
+
+        const actionLabels = { created: 'Created', updated: 'Updated', deleted: 'Deleted' };
+        const entityLabels = { lead: 'Team Lead', campaign: 'Campaign' };
+        const actionIcons = { created: '+', updated: '\u270E', deleted: '\u2716' };
+
+        container.innerHTML = `
+            <div class="activity-header">
+                <h3>Recent Activity</h3>
+                <span style="font-size:12px;color:var(--text-muted);">${activities.length} entries</span>
+            </div>
+            <div class="activity-list">
+                ${activities.map(a => `
+                    <div class="activity-item">
+                        <div class="activity-icon ${a.action}">${actionIcons[a.action] || '\u2022'}</div>
+                        <div class="activity-body">
+                            <div>
+                                <span class="activity-action ${a.action}">${actionLabels[a.action] || a.action}</span>
+                                <span class="activity-entity">${a.entity_name}</span>
+                                <span style="color:var(--text-muted);font-size:12px;">${entityLabels[a.entity_type] || a.entity_type}</span>
+                            </div>
+                            ${a.details ? `<div class="activity-details">${a.details}</div>` : ''}
+                        </div>
+                        <div class="activity-time">${fmtTime(a.created_at)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="activity-empty">Error loading activity: ${e.message}</div>`;
     }
 }

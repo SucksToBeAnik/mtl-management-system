@@ -38,3 +38,15 @@ class Campaign(Base):
 
     team_lead_id = Column(Integer, ForeignKey("team_leads.id", ondelete="CASCADE"), nullable=False)
     team_lead = relationship("TeamLead", back_populates="campaigns")
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    action = Column(String(20), nullable=False)
+    entity_type = Column(String(20), nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    entity_name = Column(String(200), nullable=False)
+    details = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

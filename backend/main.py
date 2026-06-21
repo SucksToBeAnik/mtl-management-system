@@ -2,12 +2,13 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import Optional
+from datetime import datetime
 
 from database import engine, Base, get_db
-from models import TeamLead, Campaign
+from models import TeamLead, Campaign, ActivityLog
 from schemas import (
     TeamLeadCreate, TeamLeadUpdate, TeamLeadResponse, TeamLeadDetailResponse,
-    CampaignCreate, CampaignUpdate, CampaignResponse,
+    CampaignCreate, CampaignUpdate, CampaignResponse, ActivityLogResponse,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -21,6 +22,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def log_activity(db: Session, action: str, entity_type: str, entity_id: int, entity_name: str, details: str = None):
+    log = ActivityLog(
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        entity_name=entity_name,
+        details=details,
+    )
+    db.add(log)
+    db.commit()
 
 
 @app.get("/api/leads", response_model=list[TeamLeadResponse])
@@ -49,6 +62,7 @@ def create_lead(lead: TeamLeadCreate, db: Session = Depends(get_db)):
     db.add(db_lead)
     db.commit()
     db.refresh(db_lead)
+    log_activity(db, "created", "lead", db_lead.id, db_lead.name)
     return db_lead
 
 
@@ -75,10 +89,12 @@ def update_lead(lead_id: int, lead: TeamLeadUpdate, db: Session = Depends(get_db
         if existing:
             raise HTTPException(status_code=400, detail="Email already in use")
 
+    changed = {k: v for k, v in update_data.items()}
     for key, value in update_data.items():
         setattr(db_lead, key, value)
     db.commit()
     db.refresh(db_lead)
+    log_activity(db, "updated", "lead", db_lead.id, db_lead.name, str(changed) if changed else None)
     return db_lead
 
 
@@ -87,8 +103,10 @@ def delete_lead(lead_id: int, db: Session = Depends(get_db)):
     db_lead = db.query(TeamLead).filter(TeamLead.id == lead_id).first()
     if not db_lead:
         raise HTTPException(status_code=404, detail="Team lead not found")
+    name = db_lead.name
     db.delete(db_lead)
     db.commit()
+    log_activity(db, "deleted", "lead", lead_id, name)
     return None
 
 
@@ -118,6 +136,7 @@ def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db)):
     db.add(db_campaign)
     db.commit()
     db.refresh(db_campaign)
+    log_activity(db, "created", "campaign", db_campaign.id, db_campaign.name, f"Lead: {lead.name}")
     return db_campaign
 
 
@@ -133,10 +152,12 @@ def update_campaign(campaign_id: int, campaign: CampaignUpdate, db: Session = De
         if not lead:
             raise HTTPException(status_code=404, detail="Team lead not found")
 
+    changed = {k: v for k, v in update_data.items()}
     for key, value in update_data.items():
         setattr(db_campaign, key, value)
     db.commit()
     db.refresh(db_campaign)
+    log_activity(db, "updated", "campaign", db_campaign.id, db_campaign.name, str(changed) if changed else None)
     return db_campaign
 
 
@@ -153,9 +174,16 @@ def delete_campaign(campaign_id: int, db: Session = Depends(get_db)):
     db_campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not db_campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    name = db_campaign.name
     db.delete(db_campaign)
     db.commit()
+    log_activity(db, "deleted", "campaign", campaign_id, name)
     return None
+
+
+@app.get("/api/activities", response_model=list[ActivityLogResponse])
+def list_activities(limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
+    return db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit).all()
 
 
 @app.get("/api/dashboard/summary")
@@ -213,5 +241,10 @@ def seed_data(db: Session = Depends(get_db)):
     ]
     db.add_all(campaigns)
     db.commit()
+
+    for l in leads:
+        log_activity(db, "created", "lead", l.id, l.name)
+    for c in campaigns:
+        log_activity(db, "created", "campaign", c.id, c.name)
 
     return {"message": "Seed data created", "leads": len(leads), "campaigns": len(campaigns)}

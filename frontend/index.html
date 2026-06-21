@@ -41,21 +41,41 @@
             <button class="btn btn-primary" onclick="openAddLeadModal()">+ New Lead</button>
         </section>
 
-        <section class="leads-section">
-            <table id="leadsTable">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Department</th>
-                        <th>Status</th>
-                        <th>Campaigns</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="leadsBody"></tbody>
-            </table>
-            <p id="emptyState" class="empty-state">No team leads yet. Add one or load sample data!</p>
+        <div class="tabs">
+            <button class="tab tab-active" onclick="switchTab('leads')" id="tab-leads">Leads</button>
+            <button class="tab" onclick="switchTab('timeline')" id="tab-timeline">Timeline</button>
+            <button class="tab" onclick="switchTab('activity')" id="tab-activity">Activity</button>
+        </div>
+
+        <section id="view-leads" class="view view-active">
+            <section class="leads-section">
+                <table id="leadsTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Department</th>
+                            <th>Status</th>
+                            <th>Campaigns</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsBody"></tbody>
+                </table>
+                <p id="emptyState" class="empty-state">No team leads yet. Add one or load sample data!</p>
+            </section>
+        </section>
+
+        <section id="view-timeline" class="view">
+            <div class="timeline-container" id="timelineContainer">
+                <p class="empty-state">Loading timeline...</p>
+            </div>
+        </section>
+
+        <section id="view-activity" class="view">
+            <div class="activity-container" id="activityContainer">
+                <p class="empty-state">Loading activity log...</p>
+            </div>
         </section>
     </div>
 
