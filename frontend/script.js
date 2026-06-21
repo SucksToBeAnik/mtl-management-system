@@ -1,11 +1,38 @@
-// Change this to your Render backend URL in production
 const API = window.API_URL || 'http://127.0.0.1:8000';
 
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     renderLeads();
     renderSummary();
 });
 
+// --- Theme ---
+function initTheme() {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light') {
+        document.documentElement.classList.add('light-mode');
+    } else {
+        document.documentElement.classList.add('dark-mode');
+    }
+    updateThemeIcon();
+}
+
+function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.classList.toggle('dark-mode');
+    html.classList.toggle('light-mode', !isDark);
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    updateThemeIcon();
+    // Re-render chart with new colors
+    renderSummary();
+}
+
+function updateThemeIcon() {
+    const icon = document.getElementById('themeIcon');
+    icon.textContent = document.documentElement.classList.contains('dark-mode') ? '\u2601' : '\u25D0';
+}
+
+// --- API ---
 async function apiFetch(path, options = {}) {
     const res = await fetch(`${API}${path}`, {
         headers: { 'Content-Type': 'application/json', ...options.headers },
@@ -25,6 +52,7 @@ function showToast(message, type = 'success') {
 }
 
 function openModal(id) {
+    clearErrors(id === 'leadModal' ? 'leadForm' : 'campaignForm');
     document.getElementById(id).classList.add('open');
 }
 
@@ -33,9 +61,191 @@ function closeModal(id) {
 }
 
 function formatDate(d) {
-    if (!d) return '—';
+    if (!d) return '\u2014';
     const date = new Date(d);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function isDarkMode() {
+    return document.documentElement.classList.contains('dark-mode');
+}
+
+// --- Validation ---
+const VALIDATORS = {
+    leadName: (v) => !v.trim() ? 'Name is required' : null,
+    leadEmail: (v) => {
+        if (!v.trim()) return 'Email is required';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Invalid email format';
+        return null;
+    },
+    leadPhone: (v) => {
+        if (v && !/^[\d\s\-+()]{7,20}$/.test(v)) return 'Invalid phone format';
+        return null;
+    },
+    leadDepartment: (v) => !v ? 'Department is required' : null,
+    campaignName: (v) => !v.trim() ? 'Campaign name is required' : null,
+    campaignType: (v) => !v ? 'Campaign type is required' : null,
+    campaignChannel: (v) => !v ? 'Channel is required' : null,
+    campaignStatus: (v) => !v ? 'Status is required' : null,
+    campaignProgress: (v) => {
+        if (v === '' || v === null || v === undefined) return 'Progress is required';
+        const n = parseInt(v);
+        if (isNaN(n) || n < 0 || n > 100) return 'Must be between 0 and 100';
+        return null;
+    },
+    campaignStartDate: (v) => !v ? 'Start date is required' : null,
+};
+
+function validateField(input) {
+    const errorSpan = document.getElementById(`${input.id}-error`);
+    const validator = VALIDATORS[input.id];
+    let error = null;
+    if (validator) {
+        error = validator(input.value);
+    } else if (input.hasAttribute('required') && !input.value.trim()) {
+        error = 'This field is required';
+    }
+    if (error) {
+        input.classList.add('invalid');
+        if (errorSpan) errorSpan.textContent = error;
+        return false;
+    }
+    input.classList.remove('invalid');
+    if (errorSpan) errorSpan.textContent = '';
+    return true;
+}
+
+function clearErrors(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    form.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+    form.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+}
+
+function validateForm(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return true;
+    const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]), select, textarea');
+    let valid = true;
+    inputs.forEach(input => {
+        if (!validateField(input)) valid = false;
+    });
+    // Validate checkboxes if they have a validator
+    const checks = form.querySelectorAll('input[type="checkbox"]');
+    checks.forEach(cb => {
+        const errorSpan = document.getElementById(`${cb.id}-error`);
+        if (errorSpan) errorSpan.textContent = '';
+    });
+    return valid;
+}
+
+// Auto-validate on input/blur
+document.addEventListener('input', (e) => {
+    if (e.target.closest('.modal-content')) validateField(e.target);
+});
+document.addEventListener('blur', (e) => {
+    if (e.target.closest('.modal-content')) validateField(e.target);
+}, true);
+
+// --- Chart ---
+const CHART_COLORS_LIGHT = ['#16a34a', '#2563eb', '#7c3aed', '#ca8a04', '#6b7280'];
+const CHART_COLORS_DARK = ['#4ade80', '#60a5fa', '#a78bfa', '#fbbf24', '#9ca3af'];
+const CHART_LABELS = ['Completed', 'In Progress', 'Review', 'Planning', 'On Hold'];
+const STATUS_KEY_MAP = {
+    'Completed': 'completed',
+    'In Progress': 'in_progress',
+    'Review': 'review',
+    'Planning': 'planning',
+    'On Hold': 'on_hold',
+};
+
+function drawDonutChart(data) {
+    const canvas = document.getElementById('statusChart');
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth - 36 || 180;
+    const h = 160;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const outerR = Math.min(w, h) / 2 - 20;
+    const innerR = outerR * 0.58;
+
+    const colors = isDarkMode() ? CHART_COLORS_DARK : CHART_COLORS_LIGHT;
+    const bgColor = isDarkMode() ? '#1e1e1e' : '#ffffff';
+
+    const breakdown = data.status_breakdown || {};
+    const total = Object.values(breakdown).reduce((s, v) => s + v, 0) || 1;
+
+    // Order by status priority
+    const order = ['Completed', 'In Progress', 'Review', 'Planning', 'On Hold'];
+    const slices = order.map((label, i) => ({
+        label,
+        value: breakdown[label] || 0,
+        color: colors[i] || colors[colors.length - 1],
+    })).filter(s => s.value > 0);
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (slices.length === 0) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+        ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fillStyle = isDarkMode() ? '#333' : '#eee';
+        ctx.fill();
+        ctx.fillStyle = isDarkMode() ? '#777' : '#999';
+        ctx.font = '12px "Inter", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('No data', cx, cy);
+        return;
+    }
+
+    let startAngle = -Math.PI / 2;
+    slices.forEach(slice => {
+        const angle = (slice.value / total) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, startAngle, startAngle + angle);
+        ctx.arc(cx, cy, innerR, startAngle + angle, startAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = slice.color;
+        ctx.fill();
+        startAngle += angle;
+    });
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.fillStyle = bgColor;
+    ctx.fill();
+
+    ctx.fillStyle = isDarkMode() ? '#fff' : '#000';
+    ctx.font = 'bold 16px "Space Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(total, cx, cy - 6);
+    ctx.fillStyle = isDarkMode() ? '#a0a0a0' : '#6b6b6b';
+    ctx.font = '10px "Inter", sans-serif';
+    ctx.fillText('campaigns', cx, cy + 12);
+
+    // Legend
+    const legendContainer = container.querySelector('.chart-legend');
+    if (legendContainer) {
+        legendContainer.innerHTML = slices.map(s => `
+            <span class="chart-legend-item">
+                <span class="legend-dot" style="background:${s.color}"></span>
+                ${s.label}
+                <span class="legend-value">${s.value}</span>
+            </span>
+        `).join('');
+    }
 }
 
 // --- Summary ---
@@ -44,33 +254,41 @@ async function renderSummary() {
         const data = await apiFetch('/api/dashboard/summary');
         const container = document.getElementById('summary');
         container.innerHTML = `
-            <div class="summary-card accent-blue">
-                <div class="value">${data.total_leads}</div>
-                <div class="label">Total Team Leads</div>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="value" style="color:${isDarkMode() ? '#86efac' : '#16a34a'}">${data.total_leads}</div>
+                    <div class="label">Team Leads</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value" style="color:${isDarkMode() ? '#93c5fd' : '#2563eb'}">${data.total_campaigns}</div>
+                    <div class="label">Total Campaigns</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value" style="color:${isDarkMode() ? '#fcd34d' : '#ca8a04'}">${data.active_campaigns}</div>
+                    <div class="label">Active</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value" style="color:${isDarkMode() ? '#86efac' : '#16a34a'}">${data.completed_campaigns}</div>
+                    <div class="label">Completed</div>
+                </div>
+                <div class="summary-card">
+                    <div class="value">${Object.keys(data.department_breakdown || {}).length}</div>
+                    <div class="label">Departments</div>
+                </div>
             </div>
-            <div class="summary-card accent-green">
-                <div class="value">${data.total_campaigns}</div>
-                <div class="label">Total Campaigns</div>
-            </div>
-            <div class="summary-card accent-orange">
-                <div class="value">${data.active_campaigns}</div>
-                <div class="label">Active Campaigns</div>
-            </div>
-            <div class="summary-card accent-purple">
-                <div class="value">${data.completed_campaigns}</div>
-                <div class="label">Completed</div>
-            </div>
-            <div class="summary-card accent-red">
-                <div class="value">${Object.keys(data.department_breakdown || {}).length}</div>
-                <div class="label">Departments</div>
+            <div class="chart-card">
+                <div class="chart-title">Campaign Status</div>
+                <canvas id="statusChart"></canvas>
+                <div class="chart-legend"></div>
             </div>
         `;
+        drawDonutChart(data);
     } catch (e) {
         console.error('Summary error:', e);
     }
 }
 
-// --- Leads CRUD ---
+// --- Leads ---
 let expandedLeadId = null;
 
 async function renderLeads() {
@@ -101,122 +319,143 @@ async function renderLeads() {
                 <td>${lead.email}</td>
                 <td>${lead.department}</td>
                 <td><span class="badge ${lead.is_active ? 'badge-active' : 'badge-inactive'}">${lead.is_active ? 'Active' : 'Inactive'}</span></td>
-                <td>${lead.campaigns ? lead.campaigns.length : '...'}</td>
+                <td>${lead.campaigns ? lead.campaigns.length : '\u2026'}</td>
                 <td class="actions-cell">
-                    <button class="btn-icon" onclick="event.stopPropagation(); openEditLeadModal(${lead.id})">Edit</button>
-                    <button class="btn-icon" style="color:#ef4444;" onclick="event.stopPropagation(); deleteLead(${lead.id})">Delete</button>
+                    <button class="btn-icon btn-sm" onclick="event.stopPropagation(); openEditLeadModal(${lead.id})">Edit</button>
+                    <button class="btn-sm" style="background:transparent;border:1px solid transparent;color:var(--danger);cursor:pointer;font-size:12px;padding:5px 10px;border-radius:6px;" onclick="event.stopPropagation(); deleteLead(${lead.id})">Delete</button>
                 </td>
             </tr>
             <tr class="campaigns-subtable ${expandedLeadId === lead.id ? 'open' : ''}" id="campaigns-${lead.id}">
-                <td colspan="6" style="padding:0;">
-                    <div id="campaigns-content-${lead.id}"></div>
+                <td colspan="6" class="campaigns-td">
+                    <div class="campaigns-content" id="campaigns-content-${lead.id}"></div>
                 </td>
             </tr>
         `).join('');
 
-        // Load campaigns for expanded leads
         if (expandedLeadId !== null) {
-            const lead = leads.find(l => l.id === expandedLeadId);
-            if (lead) {
+            const container = document.getElementById(`campaigns-content-${expandedLeadId}`);
+            if (container && !container.hasChildNodes()) {
                 renderCampaignsForLead(expandedLeadId);
             }
         }
     } catch (e) {
-        document.getElementById('leadsBody').innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#ef4444;">Error loading leads: ${e.message}</td></tr>`;
+        document.getElementById('leadsBody').innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">Error loading leads: ${e.message}</td></tr>`;
     }
 }
 
 function toggleCampaigns(leadId) {
-    if (expandedLeadId === leadId) {
-        expandedLeadId = null;
-    } else {
-        expandedLeadId = leadId;
+    const campaignRow = document.getElementById(`campaigns-${leadId}`);
+    if (!campaignRow) return;
+
+    if (expandedLeadId !== null && expandedLeadId !== leadId) {
+        const prevRow = document.getElementById(`campaigns-${expandedLeadId}`);
+        if (prevRow) prevRow.classList.remove('open');
     }
-    renderLeads();
+
+    const willOpen = !campaignRow.classList.contains('open');
+    campaignRow.classList.toggle('open', willOpen);
+    expandedLeadId = willOpen ? leadId : null;
+
+    const prevTr = campaignRow.previousElementSibling;
+    if (prevTr) {
+        const indicator = prevTr.querySelector('.expand-indicator');
+        if (indicator) indicator.classList.toggle('open', willOpen);
+    }
+
+    if (willOpen) {
+        const container = document.getElementById(`campaigns-content-${leadId}`);
+        if (container && !container.hasChildNodes()) {
+            renderCampaignsForLead(leadId);
+        }
+    }
 }
 
 async function renderCampaignsForLead(leadId) {
     const container = document.getElementById(`campaigns-content-${leadId}`);
     if (!container) return;
     try {
-        const campaignStatusFilter = document.getElementById(`camp-status-${leadId}`)?.value || '';
-        const campaignTypeFilter = document.getElementById(`camp-type-${leadId}`)?.value || '';
+        const campStatusFilter = document.getElementById(`camp-status-${leadId}`)?.value || '';
+        const campTypeFilter = document.getElementById(`camp-type-${leadId}`)?.value || '';
 
         let url = `/api/campaigns?lead_id=${leadId}`;
-        if (campaignStatusFilter) url += `&status=${encodeURIComponent(campaignStatusFilter)}`;
-        if (campaignTypeFilter) url += `&campaign_type=${encodeURIComponent(campaignTypeFilter)}`;
+        if (campStatusFilter) url += `&status=${encodeURIComponent(campStatusFilter)}`;
+        if (campTypeFilter) url += `&campaign_type=${encodeURIComponent(campTypeFilter)}`;
 
         const campaigns = await apiFetch(url);
         const lead = await apiFetch(`/api/leads/${leadId}`);
 
         const filterBar = `
-            <div style="padding:8px 24px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #eee;">
-                <span style="font-size:12px;color:#6b7280;font-weight:500;">Filter:</span>
-                <select id="camp-status-${leadId}" onchange="renderCampaignsForLead(${leadId})" style="padding:4px 8px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;">
+            <div class="filter-bar">
+                <label>Filter:</label>
+                <select id="camp-status-${leadId}" onchange="renderCampaignsForLead(${leadId})">
                     <option value="">All Status</option>
-                    <option value="Planning" ${campaignStatusFilter === 'Planning' ? 'selected' : ''}>Planning</option>
-                    <option value="In Progress" ${campaignStatusFilter === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                    <option value="Review" ${campaignStatusFilter === 'Review' ? 'selected' : ''}>Review</option>
-                    <option value="Completed" ${campaignStatusFilter === 'Completed' ? 'selected' : ''}>Completed</option>
-                    <option value="On Hold" ${campaignStatusFilter === 'On Hold' ? 'selected' : ''}>On Hold</option>
+                    <option value="Planning" ${campStatusFilter === 'Planning' ? 'selected' : ''}>Planning</option>
+                    <option value="In Progress" ${campStatusFilter === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                    <option value="Review" ${campStatusFilter === 'Review' ? 'selected' : ''}>Review</option>
+                    <option value="Completed" ${campStatusFilter === 'Completed' ? 'selected' : ''}>Completed</option>
+                    <option value="On Hold" ${campStatusFilter === 'On Hold' ? 'selected' : ''}>On Hold</option>
                 </select>
-                <select id="camp-type-${leadId}" onchange="renderCampaignsForLead(${leadId})" style="padding:4px 8px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;">
+                <select id="camp-type-${leadId}" onchange="renderCampaignsForLead(${leadId})">
                     <option value="">All Types</option>
-                    <option value="Social" ${campaignTypeFilter === 'Social' ? 'selected' : ''}>Social</option>
-                    <option value="Email" ${campaignTypeFilter === 'Email' ? 'selected' : ''}>Email</option>
-                    <option value="PPC" ${campaignTypeFilter === 'PPC' ? 'selected' : ''}>PPC</option>
-                    <option value="SEO" ${campaignTypeFilter === 'SEO' ? 'selected' : ''}>SEO</option>
-                    <option value="Content" ${campaignTypeFilter === 'Content' ? 'selected' : ''}>Content</option>
-                    <option value="Other" ${campaignTypeFilter === 'Other' ? 'selected' : ''}>Other</option>
+                    <option value="Social" ${campTypeFilter === 'Social' ? 'selected' : ''}>Social</option>
+                    <option value="Email" ${campTypeFilter === 'Email' ? 'selected' : ''}>Email</option>
+                    <option value="PPC" ${campTypeFilter === 'PPC' ? 'selected' : ''}>PPC</option>
+                    <option value="SEO" ${campTypeFilter === 'SEO' ? 'selected' : ''}>SEO</option>
+                    <option value="Content" ${campTypeFilter === 'Content' ? 'selected' : ''}>Content</option>
+                    <option value="Other" ${campTypeFilter === 'Other' ? 'selected' : ''}>Other</option>
                 </select>
-                <span style="font-size:12px;color:#9ca3af;">${campaigns.length} campaign(s)</span>
+                <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">${campaigns.length} campaign(s)</span>
             </div>
         `;
 
         if (campaigns.length === 0) {
             container.innerHTML = `
+                <div class="campaign-header">
+                    <span>Campaigns for ${lead.name}</span>
+                    <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddCampaignModal(${leadId})">+ Add Campaign</button>
+                </div>
                 ${filterBar}
-                <div style="padding:16px 24px;color:#9ca3af;font-size:13px;">
+                <div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">
                     No campaigns match your filters.
-                    <button class="btn btn-primary btn-sm add-campaign-btn" onclick="openAddCampaignModal(${leadId})">+ Add Campaign</button>
                 </div>
             `;
             return;
         }
+
         container.innerHTML = `
-            <div style="padding:12px 24px 4px 24px;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-weight:600;font-size:14px;">Campaigns for ${lead.name}</span>
+            <div class="campaign-header">
+                <span>Campaigns for ${lead.name}</span>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openAddCampaignModal(${leadId})">+ Add Campaign</button>
             </div>
             ${filterBar}
-            <table style="width:100%;">
+            <table class="campaign-table-inner" style="width:100%;">
                 <thead>
                     <tr>
-                        <th style="padding:8px 12px;font-size:12px;">Name</th>
-                        <th style="padding:8px 12px;font-size:12px;">Type</th>
-                        <th style="padding:8px 12px;font-size:12px;">Channel</th>
-                        <th style="padding:8px 12px;font-size:12px;">Status</th>
-                        <th style="padding:8px 12px;font-size:12px;">Progress</th>
-                        <th style="padding:8px 12px;font-size:12px;">Dates</th>
-                        <th style="padding:8px 12px;font-size:12px;">Actions</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Channel</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                        <th>Dates</th>
+                        <th style="width:100px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${campaigns.map(c => {
-                        const statusClass = c.status.toLowerCase().replace(' ', '-');
-                        return `<tr style="background:#f8fafc;">
-                            <td style="padding:8px 12px;font-size:13px;">${c.name}</td>
-                            <td style="padding:8px 12px;font-size:13px;"><span class="badge badge-${statusClass}">${c.campaign_type}</span></td>
-                            <td style="padding:8px 12px;font-size:13px;">${c.channel}</td>
-                            <td style="padding:8px 12px;font-size:13px;"><span class="badge badge-${statusClass}">${c.status}</span></td>
-                            <td style="padding:8px 12px;font-size:13px;">
+                        const sc = c.status.toLowerCase().replace(/ /g, '-');
+                        return `<tr>
+                            <td>${c.name}</td>
+                            <td><span class="badge badge-${sc}">${c.campaign_type}</span></td>
+                            <td>${c.channel}</td>
+                            <td><span class="badge badge-${sc}">${c.status}</span></td>
+                            <td>
                                 <div class="progress-bar"><div class="progress-fill" style="width:${c.progress}%"></div></div>
                                 <span class="progress-text">${c.progress}%</span>
                             </td>
-                            <td style="padding:8px 12px;font-size:12px;">${formatDate(c.start_date)} — ${formatDate(c.target_end_date)}</td>
-                            <td class="actions-cell" style="padding:8px 12px;">
-                                <button class="btn-icon" style="font-size:12px;" onclick="event.stopPropagation(); openEditCampaignModal(${c.id})">Edit</button>
-                                <button class="btn-icon" style="font-size:12px;color:#ef4444;" onclick="event.stopPropagation(); deleteCampaign(${c.id})">Delete</button>
+                            <td style="font-size:11px;color:var(--text-secondary);">${formatDate(c.start_date)} \u2014 ${formatDate(c.target_end_date)}</td>
+                            <td class="actions-cell">
+                                <button class="btn-icon btn-sm" onclick="event.stopPropagation(); openEditCampaignModal(${c.id})">Edit</button>
+                                <button class="btn-sm" style="background:transparent;border:1px solid transparent;color:var(--danger);cursor:pointer;font-size:11px;padding:5px 8px;border-radius:6px;font-family:Inter,sans-serif;" onclick="event.stopPropagation(); deleteCampaign(${c.id})">Delete</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -224,7 +463,7 @@ async function renderCampaignsForLead(leadId) {
             </table>
         `;
     } catch (e) {
-        container.innerHTML = `<div style="padding:16px;color:#ef4444;font-size:13px;">Error loading campaigns: ${e.message}</div>`;
+        container.innerHTML = `<div style="padding:16px;color:var(--danger);font-size:13px;">Error: ${e.message}</div>`;
     }
 }
 
@@ -255,6 +494,8 @@ async function openEditLeadModal(leadId) {
 
 async function saveLead(event) {
     event.preventDefault();
+    if (!validateForm('leadForm')) return;
+
     const id = document.getElementById('leadId').value;
     const data = {
         name: document.getElementById('leadName').value,
@@ -266,16 +507,10 @@ async function saveLead(event) {
 
     try {
         if (id) {
-            await apiFetch(`/api/leads/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify(data),
-            });
+            await apiFetch(`/api/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) });
             showToast('Team lead updated');
         } else {
-            await apiFetch('/api/leads', {
-                method: 'POST',
-                body: JSON.stringify(data),
-            });
+            await apiFetch('/api/leads', { method: 'POST', body: JSON.stringify(data) });
             showToast('Team lead added');
         }
         closeModal('leadModal');
@@ -314,7 +549,6 @@ function openAddCampaignModal(leadId) {
 async function openEditCampaignModal(campaignId) {
     try {
         const c = await apiFetch(`/api/campaigns/${campaignId}`);
-
         document.getElementById('campaignModalTitle').textContent = 'Edit Campaign';
         document.getElementById('campaignId').value = c.id;
         document.getElementById('campaignLeadId').value = c.team_lead_id;
@@ -334,6 +568,8 @@ async function openEditCampaignModal(campaignId) {
 
 async function saveCampaign(event) {
     event.preventDefault();
+    if (!validateForm('campaignForm')) return;
+
     const id = document.getElementById('campaignId').value;
     const leadId = document.getElementById('campaignLeadId').value;
     const data = {
@@ -350,16 +586,10 @@ async function saveCampaign(event) {
 
     try {
         if (id) {
-            await apiFetch(`/api/campaigns/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify(data),
-            });
+            await apiFetch(`/api/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) });
             showToast('Campaign updated');
         } else {
-            await apiFetch('/api/campaigns', {
-                method: 'POST',
-                body: JSON.stringify(data),
-            });
+            await apiFetch('/api/campaigns', { method: 'POST', body: JSON.stringify(data) });
             showToast('Campaign added');
         }
         closeModal('campaignModal');

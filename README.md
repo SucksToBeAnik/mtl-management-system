@@ -2,6 +2,8 @@
 
 A lightweight internal dashboard for managing marketing team leads, their assigned campaigns, and work progress. Built as a monorepo with a FastAPI backend and a vanilla JS single-page frontend.
 
+> **Note:** The live demo uses SQLite, which is stored on the Render instance's ephemeral disk. Data will **not persist** across redeploys. For persistent storage, switch to PostgreSQL (Render offers a free tier). Click **"Load Sample Data"** after each deploy to reseed.
+
 ## Tech Stack
 
 | Layer | Technology |

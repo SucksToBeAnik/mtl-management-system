@@ -4,19 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marketing Team Lead Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script>window.API_URL = 'https://mtl-management-system.onrender.com';</script>
 </head>
 <body>
     <div class="app">
         <header>
-            <h1>Marketing Team Lead Manager</h1>
+            <div class="header-left">
+                <h1>MTL Manager</h1>
+                <span class="header-sub">Marketing Team Lead Dashboard</span>
+            </div>
             <div class="header-actions">
-                <button class="btn btn-primary" onclick="seedData()">Load Sample Data</button>
+                <button class="btn btn-ghost" onclick="seedData()">Load Sample Data</button>
+                <button class="btn btn-icon theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
+                    <span id="themeIcon">&#9790;</span>
+                </button>
             </div>
         </header>
 
-        <section id="summary" class="summary-cards"></section>
+        <section id="summary" class="summary-row"></section>
 
         <section class="toolbar">
             <input type="text" id="searchInput" placeholder="Search leads by name or email..." oninput="renderLeads()">
@@ -29,7 +38,7 @@
                 <option value="SEO">SEO</option>
                 <option value="General">General</option>
             </select>
-            <button class="btn btn-primary" onclick="openAddLeadModal()">+ Add Team Lead</button>
+            <button class="btn btn-primary" onclick="openAddLeadModal()">+ New Lead</button>
         </section>
 
         <section class="leads-section">
@@ -54,35 +63,46 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('leadModal')">&times;</span>
             <h2 id="leadModalTitle">Add Team Lead</h2>
-            <form id="leadForm" onsubmit="saveLead(event)">
+            <form id="leadForm" onsubmit="saveLead(event)" novalidate>
                 <input type="hidden" id="leadId">
-                <label>Name *</label>
-                <input type="text" id="leadName" required>
-
-                <label>Email *</label>
-                <input type="email" id="leadEmail" required>
-
-                <label>Phone</label>
-                <input type="text" id="leadPhone">
-
-                <label>Department *</label>
-                <select id="leadDepartment" required>
-                    <option value="">Select...</option>
-                    <option value="Social Media">Social Media</option>
-                    <option value="Email Marketing">Email Marketing</option>
-                    <option value="Content">Content</option>
-                    <option value="Paid Ads">Paid Ads</option>
-                    <option value="SEO">SEO</option>
-                    <option value="General">General</option>
-                </select>
-
-                <label>
-                    <input type="checkbox" id="leadActive" checked> Active
-                </label>
-
+                <div class="field-group">
+                    <label>Name <span class="required">*</span></label>
+                    <input type="text" id="leadName" placeholder="e.g. Alice Johnson" required>
+                    <span class="field-error" id="leadName-error"></span>
+                </div>
+                <div class="field-group">
+                    <label>Email <span class="required">*</span></label>
+                    <input type="email" id="leadEmail" placeholder="e.g. alice@company.com" required>
+                    <span class="field-error" id="leadEmail-error"></span>
+                </div>
+                <div class="field-group">
+                    <label>Phone</label>
+                    <input type="text" id="leadPhone" placeholder="e.g. 555-0101">
+                    <span class="field-error" id="leadPhone-error"></span>
+                </div>
+                <div class="field-group">
+                    <label>Department <span class="required">*</span></label>
+                    <select id="leadDepartment" required>
+                        <option value="">Select a department...</option>
+                        <option value="Social Media">Social Media</option>
+                        <option value="Email Marketing">Email Marketing</option>
+                        <option value="Content">Content</option>
+                        <option value="Paid Ads">Paid Ads</option>
+                        <option value="SEO">SEO</option>
+                        <option value="General">General</option>
+                    </select>
+                    <span class="field-error" id="leadDepartment-error"></span>
+                </div>
+                <div class="field-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="leadActive" checked>
+                        <span class="checkbox-custom"></span>
+                        Active
+                    </label>
+                </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Save</button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('leadModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
         </div>
@@ -92,61 +112,86 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('campaignModal')">&times;</span>
             <h2 id="campaignModalTitle">Add Campaign</h2>
-            <form id="campaignForm" onsubmit="saveCampaign(event)">
+            <form id="campaignForm" onsubmit="saveCampaign(event)" novalidate>
                 <input type="hidden" id="campaignId">
                 <input type="hidden" id="campaignLeadId">
 
-                <label>Campaign Name *</label>
-                <input type="text" id="campaignName" required>
+                <div class="field-group">
+                    <label>Campaign Name <span class="required">*</span></label>
+                    <input type="text" id="campaignName" placeholder="e.g. Summer Sale Social" required>
+                    <span class="field-error" id="campaignName-error"></span>
+                </div>
 
-                <label>Campaign Type *</label>
-                <select id="campaignType" required>
-                    <option value="">Select...</option>
-                    <option value="Social">Social</option>
-                    <option value="Email">Email</option>
-                    <option value="PPC">PPC</option>
-                    <option value="SEO">SEO</option>
-                    <option value="Content">Content</option>
-                    <option value="Other">Other</option>
-                </select>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Campaign Type <span class="required">*</span></label>
+                        <select id="campaignType" required>
+                            <option value="">Select...</option>
+                            <option value="Social">Social</option>
+                            <option value="Email">Email</option>
+                            <option value="PPC">PPC</option>
+                            <option value="SEO">SEO</option>
+                            <option value="Content">Content</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <span class="field-error" id="campaignType-error"></span>
+                    </div>
+                    <div class="field-group">
+                        <label>Channel <span class="required">*</span></label>
+                        <select id="campaignChannel" required>
+                            <option value="">Select...</option>
+                            <option value="Facebook">Facebook</option>
+                            <option value="Instagram">Instagram</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                            <option value="Twitter/X">Twitter/X</option>
+                            <option value="Google">Google</option>
+                            <option value="Email">Email</option>
+                            <option value="Organic">Organic</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <span class="field-error" id="campaignChannel-error"></span>
+                    </div>
+                </div>
 
-                <label>Channel *</label>
-                <select id="campaignChannel" required>
-                    <option value="">Select...</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="Instagram">Instagram</option>
-                    <option value="LinkedIn">LinkedIn</option>
-                    <option value="Twitter/X">Twitter/X</option>
-                    <option value="Google">Google</option>
-                    <option value="Email">Email</option>
-                    <option value="Organic">Organic</option>
-                    <option value="Other">Other</option>
-                </select>
+                <div class="field-group">
+                    <label>Description</label>
+                    <textarea id="campaignDescription" rows="3" placeholder="Brief description of the campaign..."></textarea>
+                </div>
 
-                <label>Description</label>
-                <textarea id="campaignDescription" rows="3"></textarea>
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="campaignStatus" required>
+                            <option value="Planning">Planning</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Review">Review</option>
+                            <option value="Completed">Completed</option>
+                            <option value="On Hold">On Hold</option>
+                        </select>
+                        <span class="field-error" id="campaignStatus-error"></span>
+                    </div>
+                    <div class="field-group">
+                        <label>Progress <span class="required">*</span></label>
+                        <input type="number" id="campaignProgress" min="0" max="100" placeholder="0-100" value="0" required>
+                        <span class="field-error" id="campaignProgress-error"></span>
+                    </div>
+                </div>
 
-                <label>Status *</label>
-                <select id="campaignStatus" required>
-                    <option value="Planning">Planning</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Review">Review</option>
-                    <option value="Completed">Completed</option>
-                    <option value="On Hold">On Hold</option>
-                </select>
-
-                <label>Progress (0-100%)</label>
-                <input type="number" id="campaignProgress" min="0" max="100" value="0">
-
-                <label>Start Date *</label>
-                <input type="date" id="campaignStartDate" required>
-
-                <label>Target End Date</label>
-                <input type="date" id="campaignEndDate">
+                <div class="field-row">
+                    <div class="field-group">
+                        <label>Start Date <span class="required">*</span></label>
+                        <input type="date" id="campaignStartDate" required>
+                        <span class="field-error" id="campaignStartDate-error"></span>
+                    </div>
+                    <div class="field-group">
+                        <label>Target End Date</label>
+                        <input type="date" id="campaignEndDate">
+                    </div>
+                </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Save</button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('campaignModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
         </div>
