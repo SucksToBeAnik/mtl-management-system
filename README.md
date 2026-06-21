@@ -20,7 +20,7 @@ A lightweight internal dashboard for managing marketing team leads, their assign
 - **Expandable Dashboard** — Click a lead row to expand and see their campaigns inline
 - **Summary Cards** — At-a-glance stats: total leads, active campaigns, completed work, department count
 - **Search & Filters** — Search leads by name/email, filter by department; filter campaigns by status and type
-- **Validation** — Required fields, email uniqueness, progress range (0–100)
+- **Validation** — Required fields, email uniqueness, progress range (0-100)
 - **Sample Data** — One-click seed button to load demo data
 
 ## Project Structure
@@ -63,7 +63,7 @@ The API will be available at `http://127.0.0.1:8000`. Interactive docs at `http:
 
 ### Frontend
 
-Simply open `frontend/index.html` in your browser. The frontend is configured to point at `http://127.0.0.1:8000` by default.
+Simply open `frontend/index.html` in your browser.
 
 ### Load Sample Data
 
@@ -90,33 +90,25 @@ Once the backend is running, click the **"Load Sample Data"** button on the dash
 
 ### Backend (Render)
 
-1. Push this repo to GitHub
+The backend is deployed at **https://mtl-management-system.onrender.com**.
+
+To deploy your own instance:
+1. Fork this repo on GitHub
 2. Go to [Render Dashboard](https://dashboard.render.com) → New → Web Service
 3. Connect your GitHub repo
 4. Set:
    - **Root Directory**: `backend`
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Deploy and copy the URL (e.g. `https://your-app.onrender.com`)
+5. Deploy
 
 ### Frontend (Vercel)
 
+The frontend is already configured to point at the Render backend. To deploy on Vercel:
 1. Go to [Vercel Dashboard](https://vercel.com) → Add New → Project
 2. Import your GitHub repo
 3. Set:
    - **Root Directory**: `frontend`
    - **Build Command**: leave blank (static files)
    - **Output Directory**: `.` (root of frontend folder)
-4. Before deploying, update `script.js` to point to your Render URL:
-
-   ```js
-   const API = window.API_URL || 'https://your-app.onrender.com';
-   ```
-
-   Or add before the closing `</head>` in `index.html`:
-
-   ```html
-   <script>window.API_URL = 'https://your-app.onrender.com';</script>
-   ```
-
-5. Deploy
+4. Deploy
