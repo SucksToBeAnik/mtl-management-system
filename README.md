@@ -90,7 +90,7 @@ Once the backend is running, click the **"Load Sample Data"** button on the dash
 
 ### Backend (Render)
 
-The backend is deployed at **https://mtl-management-system.onrender.com**.
+The backend is deployed at **https://mtl-management-system.onrender.com** and the frontend at **https://mtl-management-system.vercel.app**.
 
 To deploy your own instance:
 1. Fork this repo on GitHub
