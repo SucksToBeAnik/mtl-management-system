@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Team Lead Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>Marketing Team Lead Manager</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="seedData()">Load Sample Data</button>
+            </div>
+        </header>
+
+        <section id="summary" class="summary-cards"></section>
+
+        <section class="toolbar">
+            <input type="text" id="searchInput" placeholder="Search leads by name or email..." oninput="renderLeads()">
+            <select id="deptFilter" onchange="renderLeads()">
+                <option value="">All Departments</option>
+                <option value="Social Media">Social Media</option>
+                <option value="Email Marketing">Email Marketing</option>
+                <option value="Content">Content</option>
+                <option value="Paid Ads">Paid Ads</option>
+                <option value="SEO">SEO</option>
+                <option value="General">General</option>
+            </select>
+            <button class="btn btn-primary" onclick="openAddLeadModal()">+ Add Team Lead</button>
+        </section>
+
+        <section class="leads-section">
+            <table id="leadsTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Campaigns</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="leadsBody"></tbody>
+            </table>
+            <p id="emptyState" class="empty-state">No team leads yet. Add one or load sample data!</p>
+        </section>
+    </div>
+
+    <div id="leadModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('leadModal')">&times;</span>
+            <h2 id="leadModalTitle">Add Team Lead</h2>
+            <form id="leadForm" onsubmit="saveLead(event)">
+                <input type="hidden" id="leadId">
+                <label>Name *</label>
+                <input type="text" id="leadName" required>
+
+                <label>Email *</label>
+                <input type="email" id="leadEmail" required>
+
+                <label>Phone</label>
+                <input type="text" id="leadPhone">
+
+                <label>Department *</label>
+                <select id="leadDepartment" required>
+                    <option value="">Select...</option>
+                    <option value="Social Media">Social Media</option>
+                    <option value="Email Marketing">Email Marketing</option>
+                    <option value="Content">Content</option>
+                    <option value="Paid Ads">Paid Ads</option>
+                    <option value="SEO">SEO</option>
+                    <option value="General">General</option>
+                </select>
+
+                <label>
+                    <input type="checkbox" id="leadActive" checked> Active
+                </label>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('leadModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="campaignModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('campaignModal')">&times;</span>
+            <h2 id="campaignModalTitle">Add Campaign</h2>
+            <form id="campaignForm" onsubmit="saveCampaign(event)">
+                <input type="hidden" id="campaignId">
+                <input type="hidden" id="campaignLeadId">
+
+                <label>Campaign Name *</label>
+                <input type="text" id="campaignName" required>
+
+                <label>Campaign Type *</label>
+                <select id="campaignType" required>
+                    <option value="">Select...</option>
+                    <option value="Social">Social</option>
+                    <option value="Email">Email</option>
+                    <option value="PPC">PPC</option>
+                    <option value="SEO">SEO</option>
+                    <option value="Content">Content</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <label>Channel *</label>
+                <select id="campaignChannel" required>
+                    <option value="">Select...</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="Twitter/X">Twitter/X</option>
+                    <option value="Google">Google</option>
+                    <option value="Email">Email</option>
+                    <option value="Organic">Organic</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <label>Description</label>
+                <textarea id="campaignDescription" rows="3"></textarea>
+
+                <label>Status *</label>
+                <select id="campaignStatus" required>
+                    <option value="Planning">Planning</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Review">Review</option>
+                    <option value="Completed">Completed</option>
+                    <option value="On Hold">On Hold</option>
+                </select>
+
+                <label>Progress (0-100%)</label>
+                <input type="number" id="campaignProgress" min="0" max="100" value="0">
+
+                <label>Start Date *</label>
+                <input type="date" id="campaignStartDate" required>
+
+                <label>Target End Date</label>
+                <input type="date" id="campaignEndDate">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('campaignModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
