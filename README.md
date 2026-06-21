@@ -117,4 +117,4 @@ The frontend is already configured to point at the Render backend. To deploy on 
 
 ## Session Viewer
 
-Open `session-viewer.html` in your browser to view the full AI-assisted conversation that built this project. It renders user prompts, AI responses, reasoning, and tool calls in a readable chat UI with collapsible sections.
+Open `session-viewer.html` in your browser, click "Choose session-export.json", and select the exported JSON file to browse the full AI-assisted conversation. It renders user prompts, AI responses, reasoning, and tool calls in a readable chat UI with collapsible sections.

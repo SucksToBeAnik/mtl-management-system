@@ -150,47 +150,17 @@
             <h1>Session Chat Viewer</h1>
             <div class="meta">AI-assisted conversation log for this project</div>
         </div>
-        <div class="status" id="status">Loading...</div>
-        <div id="chat" class="chat"></div>
+        <div class="status" id="status"></div>
+        <div id="chat" class="chat">
+            <div class="empty" style="padding:60px 40px;">
+                <p style="margin-bottom:20px; color:#a1a1aa;">Select the exported session JSON file to view the conversation.</p>
+                <button class="load-btn" onclick="document.getElementById('fileInput').click()">Choose session-export.json</button>
+                <input type="file" id="fileInput" accept=".json">
+            </div>
+        </div>
     </div>
 
-    <div id="jsonData" class="hidden-data"></div>
-
     <script>
-        // Load JSON from the separate file using XMLHttpRequest (works on file://)
-        function loadJSON() {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', 'session-export.json', true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 0 || xhr.status === 200) {
-                        try {
-                            var data = JSON.parse(xhr.responseText);
-                            renderChat(data);
-                        } catch (e) {
-                            document.getElementById('status').textContent = 'Parse error: ' + e.message;
-                            showFilePicker();
-                        }
-                    } else {
-                        document.getElementById('status').textContent = 'Failed to load (HTTP ' + xhr.status + ')';
-                        showFilePicker();
-                    }
-                }
-            };
-            xhr.onerror = function() {
-                document.getElementById('status').textContent = 'Failed to load session-export.json';
-                showFilePicker();
-            };
-            xhr.send();
-        }
-
-        function showFilePicker() {
-            var chat = document.getElementById('chat');
-            chat.innerHTML = '<div class="empty">Could not auto-load session-export.json.</div>' +
-                '<button class="load-btn" onclick="document.getElementById(\'fileInput\').click()">Select file manually</button>' +
-                '<input type="file" id="fileInput" accept=".json">';
-        }
-
         document.addEventListener('change', function(e) {
             if (e.target.id !== 'fileInput') return;
             var file = e.target.files[0];
@@ -206,8 +176,6 @@
             };
             reader.readAsText(file);
         });
-
-        loadJSON();
 
         function fmtTime(ts) {
             var d = new Date(ts);
