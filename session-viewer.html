@@ -152,16 +152,27 @@
     <div class="container">
         <div class="header">
             <h1>Session Chat Viewer</h1>
-            <div class="meta">Export conversation viewer for opencode sessions</div>
+            <div class="meta">AI-assisted conversation log for this project</div>
         </div>
-        <input type="file" id="fileInput" accept=".json">
-        <button class="load-btn" onclick="document.getElementById('fileInput').click()">Load session-export.json</button>
-        <div class="status" id="status">Select a session export JSON to view</div>
+        <div class="status" id="status">Loading...</div>
         <div id="chat" class="chat"></div>
     </div>
 
     <script>
-        document.getElementById('fileInput').addEventListener('change', function(e) {
+        (async function() {
+            try {
+                const res = await fetch('session-export.json');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                renderChat(data);
+            } catch (err) {
+                document.getElementById('status').textContent = 'Error loading session: ' + err.message;
+                document.getElementById('chat').innerHTML = '<div class="empty">Could not load session-export.json. Make sure it\'s in the same folder and try again.</div><button class="load-btn" onclick="document.getElementById(\'fileInput\').click()">Select file manually</button><input type="file" id="fileInput" accept=".json">';
+            }
+        })();
+
+        document.addEventListener('change', function(e) {
+            if (e.target.id !== 'fileInput') return;
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
